@@ -347,6 +347,12 @@ const FileRow: React.FC<FileRowProps> = ({
     setContextMenuPath(node.path);
   }, [node.path, setContextMenuPath]);
 
+  const handleDragStart = React.useCallback((e: React.DragEvent) => {
+    const relativePath = getDisplayPath(root, node.path) || node.path;
+    e.dataTransfer.setData('application/x-openchamber-file-path', relativePath);
+    e.dataTransfer.effectAllowed = 'copy';
+  }, [node.path, root]);
+
   return (
     <div
       className="group relative flex items-center"
@@ -356,9 +362,12 @@ const FileRow: React.FC<FileRowProps> = ({
         type="button"
         onClick={handleInteraction}
         onContextMenu={!isMobile ? handleContextMenu : undefined}
+        draggable
+        onDragStart={handleDragStart}
         className={cn(
           'flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-foreground transition-colors pr-8 select-none',
-          isActive ? 'bg-interactive-selection/70' : 'hover:bg-interactive-hover/40'
+          isActive ? 'bg-interactive-selection/70' : 'hover:bg-interactive-hover/40',
+          'cursor-grab active:cursor-grabbing'
         )}
       >
         {isDir ? (

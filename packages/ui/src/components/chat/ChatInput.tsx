@@ -2444,6 +2444,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
             if (lowerTypes.includes('files')) return true;
             if (lowerTypes.includes('text/uri-list')) return true;
             if (lowerTypes.includes('codefiles')) return true;
+            if (lowerTypes.includes('application/x-openchamber-file-path')) return true;
             if (lowerTypes.some((type) => type.includes('vnd.code.tree'))) return true;
         }
 
@@ -2601,6 +2602,16 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
         setIsDragging(false);
 
         if (!currentSessionId && !newSessionDraftOpen) return;
+
+        // Internal drag: file tree → chat input (relative path as @mention)
+        const internalPath = e.dataTransfer.getData('application/x-openchamber-file-path');
+        if (internalPath) {
+            const mention = `@${internalPath}`;
+            setPendingInputText(mention, 'append-inline');
+            toast.success('Added file mention');
+            clearDropTextSuppression();
+            return;
+        }
 
         const files = collectDroppedFiles(e.dataTransfer);
 

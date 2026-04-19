@@ -122,6 +122,7 @@ const FileStatusDot: React.FC<{ status: FileStatus }> = ({ status }) => {
 
 interface FileRowProps {
   node: FileNode;
+  root: string;
   isExpanded: boolean;
   isActive: boolean;
   status?: FileStatus | null;
@@ -142,8 +143,18 @@ interface FileRowProps {
   onOpenDialog: (type: 'createFile' | 'createFolder' | 'rename' | 'delete', data: { path: string; name?: string; type?: 'file' | 'directory' }) => void;
 }
 
+const getRelativePath = (root: string, path: string): string => {
+  const normalizedPath = normalizePath(path);
+  const normalizedRoot = normalizePath(root).replace(/\/+$/, '');
+  if (!normalizedRoot || !normalizedPath.startsWith(`${normalizedRoot}/`)) {
+    return normalizedPath;
+  }
+  return normalizedPath.slice(normalizedRoot.length + 1);
+};
+
 const FileRow: React.FC<FileRowProps> = ({
   node,
+  root,
   isExpanded,
   isActive,
   status,
@@ -179,6 +190,11 @@ const FileRow: React.FC<FileRowProps> = ({
     setContextMenuPath(node.path);
   }, [node.path, setContextMenuPath]);
 
+  const handleDragStart = React.useCallback((e: React.DragEvent) => {
+    e.dataTransfer.setData('application/x-openchamber-file-path', getRelativePath(root, node.path));
+    e.dataTransfer.effectAllowed = 'copy';
+  }, [node.path, root]);
+
   return (
     <div
       className="group relative flex items-center"
@@ -188,9 +204,12 @@ const FileRow: React.FC<FileRowProps> = ({
         type="button"
         onClick={handleInteraction}
         onContextMenu={handleContextMenu}
+        draggable
+        onDragStart={handleDragStart}
         className={cn(
           'flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-foreground transition-colors pr-8 select-none',
-          isActive ? 'bg-interactive-selection/70' : 'hover:bg-interactive-hover/40'
+          isActive ? 'bg-interactive-selection/70' : 'hover:bg-interactive-hover/40',
+          'cursor-grab active:cursor-grabbing'
         )}
       >
         {isDir ? (
@@ -755,6 +774,7 @@ export const SidebarFilesTree: React.FC = () => {
           )}
           <FileRow
             node={node}
+            root={root}
             isExpanded={isExpanded}
             isActive={isActive}
             status={!isDir ? getFileStatus(node.path) : undefined}
