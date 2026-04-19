@@ -810,8 +810,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
             const isAgentMention = isBoundary && mention.length > 0 && knownAgentNames.has(mention.toLowerCase());
             const isFileMention = isBoundary
                 && mention.length > 0
-                && !knownAgentNames.has(mention.toLowerCase())
-                && (mention.includes('/') || mention.includes('\\') || mention.includes('.'));
+                && !knownAgentNames.has(mention.toLowerCase());
 
             if (start > lastIndex) {
                 parts.push({ text: message.slice(lastIndex, start), mentionKind: 'none' });
@@ -1601,6 +1600,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
             const selectionStart = textarea?.selectionStart ?? message.length;
             const selectionEnd = textarea?.selectionEnd ?? message.length;
             const hasCollapsedSelection = selectionStart === selectionEnd;
+            const knownAgentNames = new Set(agents.map((agent) => agent.name.toLowerCase()));
 
             if (hasCollapsedSelection) {
                 const probeIndex = e.key === 'Backspace' ? selectionStart - 1 : selectionStart;
@@ -1617,7 +1617,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
 
                     const token = message.slice(tokenStart, tokenEnd);
                     const looksLikeFileMention = FILE_MENTION_TOKEN.test(token)
-                        && (token.includes('/') || token.includes('\\') || token.includes('.'));
+                        && !knownAgentNames.has(token.slice(1).toLowerCase());
 
                     if (looksLikeFileMention) {
                         const removeUntil = message[tokenEnd] === ' ' ? tokenEnd + 1 : tokenEnd;

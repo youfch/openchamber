@@ -165,7 +165,6 @@ export const FileMentionAutocomplete = React.forwardRef<FileMentionHandle, FileM
     searchFiles(currentDirectory, normalizedQueryLower, 80, {
       includeHidden: showHidden,
       respectGitignore: !showGitignored,
-      type: 'file',
     })
       .then((hits) => {
         if (cancelled) {
