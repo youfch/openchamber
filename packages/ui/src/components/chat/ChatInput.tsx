@@ -686,6 +686,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
     const [historyIndex, setHistoryIndex] = React.useState(-1); // -1 = not browsing, 0+ = index from most recent
     const [draftMessage, setDraftMessage] = React.useState(''); // Preserves input when entering history mode
     const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+    const cursorPosRef = React.useRef(0);
     const previousMessageLengthRef = React.useRef(message.length);
     const dropZoneRef = React.useRef<HTMLDivElement>(null);
     const suppressNextFileDropTextInsertRef = React.useRef(false);
@@ -2609,7 +2610,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
             const mention = `@${internalPath}`;
             const textarea = textareaRef.current;
             if (textarea) {
-                const pos = textarea.selectionStart ?? message.length;
+                const pos = cursorPosRef.current;
                 const end = textarea.selectionEnd ?? pos;
                 const before = message.slice(0, pos);
                 const after = message.slice(end);
@@ -2619,15 +2620,15 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
                 const nextMessage = `${before}${insert}${after}`;
                 setMessage(nextMessage);
                 requestAnimationFrame(() => {
-                    const cursorPos = pos + insert.length - (needSpaceAfter ? 0 : 0);
+                    const cursorPos = pos + insert.length;
                     textarea.selectionStart = cursorPos;
                     textarea.selectionEnd = cursorPos;
+                    cursorPosRef.current = cursorPos;
                     textarea.focus();
                 });
             } else {
                 setMessage((prev) => appendInlineText(prev, mention));
             }
-            toast.success('Added file mention');
             clearDropTextSuppression();
             return;
         }
@@ -3533,6 +3534,11 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
                             onBeforeInput={handleBeforeInput}
                             onKeyDown={handleKeyDown}
                             onPaste={handlePaste}
+                            onSelect={(e) => {
+                                const ta = e.currentTarget;
+                                cursorPosRef.current = ta.selectionStart ?? 0;
+                                updateAutocompleteOverlayPosition();
+                            }}
                             onDragEnter={handleDragEnter}
                             onDragOver={handleDragOver}
                             onDropCapture={handleDropCapture}
@@ -3547,7 +3553,6 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
                                     composerHighlightRef.current.style.transform = `translateY(-${scrollTop}px)`;
                                 }
                             }}
-                            onSelect={updateAutocompleteOverlayPosition}
                             placeholder={currentSessionId || newSessionDraftOpen
                                 ? inputMode === 'shell'
                                     ? "Enter shell command..."
