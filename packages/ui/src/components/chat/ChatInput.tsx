@@ -708,6 +708,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
         text.includes('/') || text.includes('\\') || text.includes('.') || confirmedMentionsRef.current.has(text);
     const [inputMode, setInputMode] = React.useState<'normal' | 'shell'>('normal');
     const [isDragging, setIsDragging] = React.useState(false);
+    const [isInternalDrag, setIsInternalDrag] = React.useState(false);
     const [showFileMention, setShowFileMention] = React.useState(false);
     const [mentionQuery, setMentionQuery] = React.useState('');
     const [showCommandAutocomplete, setShowCommandAutocomplete] = React.useState(false);
@@ -1312,9 +1313,10 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
         });
 
         // Clear input and attachments
+        // Note: confirmedMentionsRef is NOT cleared here because queued messages
+        // are processed later in handleSubmit which reads the ref via extractInlineFileMentions.
+        // The ref is cleared in handleSubmit after all queued messages are sent.
         setMessage('');
-        confirmedMentionsRef.current.clear();
-        saveConfirmedMentions(currentSessionId, confirmedMentionsRef.current);
         if (attachmentsToQueue.length > 0) {
             clearAttachedFiles();
         }
@@ -2629,6 +2631,10 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
         e.preventDefault();
         e.stopPropagation();
         dragEnterCountRef.current++;
+        const isInternal = e.dataTransfer.types?.includes('application/x-openchamber-file-path') ?? false;
+        if (isInternal !== isInternalDrag) {
+            setIsInternalDrag(isInternal);
+        }
         if ((currentSessionId || newSessionDraftOpen) && !isDragging) {
             setIsDragging(true);
         }
@@ -2653,6 +2659,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
         if (dragEnterCountRef.current <= 0) {
             dragEnterCountRef.current = 0;
             setIsDragging(false);
+            setIsInternalDrag(false);
             clearDropTextSuppression();
         }
     };
@@ -2660,6 +2667,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
     const handleDragEnd = () => {
         dragEnterCountRef.current = 0;
         setIsDragging(false);
+        setIsInternalDrag(false);
         clearDropTextSuppression();
     };
 
@@ -3501,7 +3509,7 @@ const ChatInputComponent: React.FC<ChatInputProps> = ({ onOpenSettings, scrollTo
                                         <RiAttachment2 className={cn(iconSizeClass, 'text-current')} />
                                     </button>
                                 </div>
-                                <p className="mt-2 typography-ui-label text-muted-foreground">Drop files here to attach</p>
+                                <p className="mt-2 typography-ui-label text-muted-foreground">{isInternalDrag ? 'Drop to insert as mention' : 'Drop files here to attach'}</p>
                             </div>
                         </div>
                     )}
