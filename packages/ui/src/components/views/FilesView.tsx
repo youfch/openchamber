@@ -2981,6 +2981,15 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
           <Button
             variant="ghost"
             size="sm"
+            onClick={() => toggleFilesViewShowGitignored()}
+            className={cn("h-8 w-8 p-0 flex-shrink-0", showGitignored && "text-primary")}
+            title={showGitignored ? 'Hide gitignored files' : 'Show gitignored files'}
+          >
+            {showGitignored ? <RiEyeLine className="h-4 w-4" /> : <RiEyeOffLine className="h-4 w-4" />}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => handleOpenDialog('createFile', { path: currentDirectory, type: 'directory' })}
             className="h-8 w-8 p-0 flex-shrink-0"
             title="New File"
@@ -2998,15 +3007,6 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
           </Button>
           <Button variant="ghost" size="sm" onClick={() => void refreshRoot()} className="h-8 w-8 p-0 flex-shrink-0">
             <RiRefreshLine className="h-4 w-4" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => toggleFilesViewShowGitignored()}
-            className={cn("h-8 w-8 p-0 flex-shrink-0", showGitignored && "text-primary")}
-            title={showGitignored ? 'Hide gitignored files' : 'Show gitignored files'}
-          >
-            {showGitignored ? <RiEyeLine className="h-4 w-4" /> : <RiEyeOffLine className="h-4 w-4" />}
           </Button>
         </div>
       </div>

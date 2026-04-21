@@ -833,6 +833,15 @@ export const SidebarFilesTree: React.FC = () => {
             </button>
           ) : null}
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => toggleFilesViewShowGitignored()}
+          className={cn("h-8 w-8 p-0 flex-shrink-0", showGitignored && "text-primary")}
+          title={showGitignored ? 'Hide gitignored files' : 'Show gitignored files'}
+        >
+          {showGitignored ? <RiEyeLine className="h-4 w-4" /> : <RiEyeOffLine className="h-4 w-4" />}
+        </Button>
         {canCreateFile && (
           <Button
             variant="ghost"
@@ -857,15 +866,6 @@ export const SidebarFilesTree: React.FC = () => {
         )}
         <Button variant="ghost" size="sm" onClick={() => void refreshRoot()} className="h-8 w-8 p-0 flex-shrink-0" title="Refresh">
           <RiRefreshLine className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => toggleFilesViewShowGitignored()}
-          className={cn("h-8 w-8 p-0 flex-shrink-0", showGitignored && "text-primary")}
-          title={showGitignored ? 'Hide gitignored files' : 'Show gitignored files'}
-        >
-          {showGitignored ? <RiEyeLine className="h-4 w-4" /> : <RiEyeOffLine className="h-4 w-4" />}
         </Button>
       </div>
 
