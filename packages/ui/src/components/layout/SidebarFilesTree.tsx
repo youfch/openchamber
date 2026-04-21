@@ -14,6 +14,8 @@ import {
   RiRefreshLine,
   RiSearchLine,
   RiDownloadLine,
+  RiEyeLine,
+  RiEyeOffLine,
 } from '@remixicon/react';
 
 import { toast } from '@/components/ui';
@@ -43,92 +45,12 @@ import { useFilesViewTabsStore } from '@/stores/useFilesViewTabsStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { useGitStatus } from '@/stores/useGitStore';
 import { useDirectoryShowHidden } from '@/lib/directoryShowHidden';
-import { useFilesViewShowGitignored } from '@/lib/filesViewShowGitignored';
+import { useFilesViewShowGitignored, toggleFilesViewShowGitignored } from '@/lib/filesViewShowGitignored';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import { cn, getRevealLabel } from '@/lib/utils';
 import { opencodeClient } from '@/lib/opencode/client';
-import { FileTypeIcon } from '@/components/icons/FileTypeIcon';
 import { getContextFileOpenFailureMessage, validateContextFileOpen } from '@/lib/contextFileOpenGuard';
-
-type FileNode = {
-  name: string;
-  path: string;
-  type: 'file' | 'directory';
-  extension?: string;
-  relativePath?: string;
-};
-
-const sortNodes = (items: FileNode[]) =>
-  items.slice().sort((a, b) => {
-    if (a.type !== b.type) {
-      return a.type === 'directory' ? -1 : 1;
-    }
-    return a.name.localeCompare(b.name);
-  });
-
-const normalizePath = (value: string): string => {
-  if (!value) return '';
-
-  const raw = value.replace(/\\/g, '/');
-  const hadUncPrefix = raw.startsWith('//');
-
-  let normalized = raw.replace(/\/+$/g, '');
-  normalized = normalized.replace(/\/+/g, '/');
-  if (hadUncPrefix && !normalized.startsWith('//')) {
-    normalized = `/${normalized}`;
-  }
-
-  if (normalized === '') {
-    return raw.startsWith('/') ? '/' : '';
-  }
-
-  return normalized;
-};
-
-const getRelativePath = (root: string, path: string): string => {
-  const normalizedPath = normalizePath(path);
-  const normalizedRoot = normalizePath(root).replace(/\/+$/, '');
-  if (normalizedPath === normalizedRoot) {
-    return '.';
-  }
-  if (!normalizedRoot || !normalizedPath.startsWith(`${normalizedRoot}/`)) {
-    return normalizedPath;
-  }
-  return normalizedPath.slice(normalizedRoot.length + 1);
-};
-
-const isAbsolutePath = (value: string): boolean => {
-  return value.startsWith('/') || value.startsWith('//') || /^[A-Za-z]:\//.test(value);
-};
-
-const DEFAULT_IGNORED_DIR_NAMES = new Set(['node_modules']);
-
-const shouldIgnoreEntryName = (name: string): boolean => DEFAULT_IGNORED_DIR_NAMES.has(name);
-
-const shouldIgnorePath = (path: string): boolean => {
-  const normalized = normalizePath(path);
-  return normalized === 'node_modules' || normalized.endsWith('/node_modules') || normalized.includes('/node_modules/');
-};
-
-const getFileIcon = (filePath: string, extension?: string): React.ReactNode => {
-  return <FileTypeIcon filePath={filePath} extension={extension} />;
-};
-
-// --- Git status indicators (matching FilesView) ---
-
-type FileStatus = 'open' | 'modified' | 'git-modified' | 'git-added' | 'git-deleted';
-
-const FileStatusDot: React.FC<{ status: FileStatus }> = ({ status }) => {
-  const color = {
-    open: 'var(--status-info)',
-    modified: 'var(--status-warning)',
-    'git-modified': 'var(--status-warning)',
-    'git-added': 'var(--status-success)',
-    'git-deleted': 'var(--status-error)',
-  }[status];
-
-  return <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />;
-};
+import { type FileStatus, type FileNode, FileStatusDot, getFileIcon, normalizePath, getRelativePath, mapDirectoryEntries as mapDirEntries } from '@/lib/fileTreeUtils';
 
 // --- FileRow with context menu (matching FilesView) ---
 
@@ -343,6 +265,8 @@ export const SidebarFilesTree: React.FC = () => {
   const EMPTY_PATHS: string[] = React.useMemo(() => [], []);
   const EMPTY_CONTEXT_TABS: Array<{ mode: string; targetPath: string | null }> = React.useMemo(() => [], []);
   const expandedPaths = useFilesViewTabsStore((state) => (root ? (state.byRoot[root]?.expandedPaths ?? EMPTY_PATHS) : EMPTY_PATHS));
+  const expandedPathsRef = React.useRef(expandedPaths);
+  expandedPathsRef.current = expandedPaths;
   const selectedPath = useFilesViewTabsStore((state) => (root ? (state.byRoot[root]?.selectedPath ?? null) : null));
   const setSelectedPath = useFilesViewTabsStore((state) => state.setSelectedPath);
   const addOpenPath = useFilesViewTabsStore((state) => state.addOpenPath);
@@ -385,26 +309,11 @@ export const SidebarFilesTree: React.FC = () => {
     setIsDialogSubmitting(false);
   }, []);
 
-  const mapDirectoryEntries = React.useCallback((dirPath: string, entries: Array<{ name: string; path: string; isDirectory: boolean }>): FileNode[] => {
-    const nodes = entries
-      .filter((entry) => entry && typeof entry.name === 'string' && entry.name.length > 0)
-      .filter((entry) => showHidden || !entry.name.startsWith('.'))
-      .filter((entry) => showGitignored || !shouldIgnoreEntryName(entry.name))
-      .map<FileNode>((entry) => {
-        const name = entry.name;
-        const normalizedEntryPath = normalizePath(entry.path || '');
-        const path = normalizedEntryPath
-          ? (isAbsolutePath(normalizedEntryPath)
-            ? normalizedEntryPath
-            : normalizePath(`${dirPath}/${normalizedEntryPath}`))
-          : normalizePath(`${dirPath}/${name}`);
-        const type = entry.isDirectory ? 'directory' : 'file';
-        const extension = type === 'file' && name.includes('.') ? name.split('.').pop()?.toLowerCase() : undefined;
-        return { name, path, type, extension };
-      });
-
-    return sortNodes(nodes);
-  }, [showGitignored, showHidden]);
+  const mapDirectoryEntries = React.useCallback(
+    (dirPath: string, entries: Array<{ name: string; path: string; isDirectory: boolean }>): FileNode[] =>
+      mapDirEntries(dirPath, entries, showHidden),
+    [showHidden],
+  );
 
   const loadDirectory = React.useCallback(async (dirPath: string) => {
     const normalizedDir = normalizePath(dirPath.trim());
@@ -476,13 +385,26 @@ export const SidebarFilesTree: React.FC = () => {
     await loadDirectory(normalized);
   }, [loadDirectory, refreshRoot]);
 
+  // Re-fetch when visibility toggles change.
+  // Do NOT clear childrenByDir — keeping the old data prevents the tree
+  // from collapsing to just the root while the new data loads.
+  // Each cached directory will be re-fetched in-place, replacing its
+  // children without disturbing other branches.
   React.useEffect(() => {
     if (!root) return;
 
     loadedDirsRef.current = new Set();
     inFlightDirsRef.current = new Set();
-    setChildrenByDir((prev) => (Object.keys(prev).length === 0 ? prev : {}));
     void loadDirectory(root);
+
+    // Also re-fetch any already-expanded sub-directories so their
+    // children reflect the new filter state.
+    for (const p of expandedPathsRef.current) {
+      const normalized = normalizePath(p);
+      if (normalized && normalized !== root && normalized.startsWith(`${root}/`)) {
+        void loadDirectory(normalized);
+      }
+    }
   }, [loadDirectory, root, showHidden, showGitignored]);
 
   React.useEffect(() => {
@@ -540,9 +462,8 @@ export const SidebarFilesTree: React.FC = () => {
       .then((hits) => {
         if (cancelled) return;
 
-        const filtered = hits.filter((hit) => showGitignored || !shouldIgnorePath(hit.path));
-
-        const mapped: FileNode[] = filtered.map((hit) => ({
+        // Server-side respectGitignore already filters gitignored entries.
+        const mapped: FileNode[] = hits.map((hit) => ({
           name: hit.name,
           path: normalizePath(hit.path),
           type: 'file',
@@ -831,6 +752,15 @@ export const SidebarFilesTree: React.FC = () => {
             </button>
           ) : null}
         </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => toggleFilesViewShowGitignored(showGitignored)}
+          className={cn("h-8 w-8 p-0 flex-shrink-0", showGitignored && "text-primary")}
+          title={showGitignored ? 'Hide gitignored files' : 'Show gitignored files'}
+        >
+          {showGitignored ? <RiEyeLine className="h-4 w-4" /> : <RiEyeOffLine className="h-4 w-4" />}
+        </Button>
         {canCreateFile && (
           <Button
             variant="ghost"

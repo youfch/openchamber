@@ -18,6 +18,10 @@ const readStoredShowGitignored = (): boolean => {
   }
 };
 
+export const toggleFilesViewShowGitignored = (current: boolean): void => {
+  setFilesViewShowGitignored(!current);
+};
+
 export const notifyFilesViewShowGitignoredChanged = () => {
   if (typeof window === 'undefined') {
     return;

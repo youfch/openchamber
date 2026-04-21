@@ -28,6 +28,8 @@ import {
   RiNodeTree,
   RiDownloadLine,
   RiMenuFold2Line,
+  RiEyeLine,
+  RiEyeOffLine,
 } from '@remixicon/react';
 import { toast } from '@/components/ui';
 import { copyTextToClipboard } from '@/lib/clipboard';
@@ -74,23 +76,17 @@ import { useGitStatus } from '@/stores/useGitStore';
 import { buildCodeMirrorCommentWidgets, normalizeLineRange, useInlineCommentController } from '@/components/comments';
 import { opencodeClient } from '@/lib/opencode/client';
 import { useDirectoryShowHidden } from '@/lib/directoryShowHidden';
-import { useFilesViewShowGitignored } from '@/lib/filesViewShowGitignored';
+import { useFilesViewShowGitignored, toggleFilesViewShowGitignored } from '@/lib/filesViewShowGitignored';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import { FileTypeIcon } from '@/components/icons/FileTypeIcon';
 import { ensurePierreThemeRegistered } from '@/lib/shiki/appThemeRegistry';
 import { getDefaultTheme } from '@/lib/theme/themes';
-import { openDesktopFileInApp, openDesktopPath } from '@/lib/desktop';
+import { openDesktopPath, openDesktopProjectInApp } from '@/lib/desktop';
+import { OPEN_DIRECTORY_APP_IDS } from '@/lib/openInApps';
 import { useOpenInAppsStore } from '@/stores/useOpenInAppsStore';
 import { eventMatchesShortcut, getEffectiveShortcutCombo } from '@/lib/shortcuts';
-
-type FileNode = {
-  name: string;
-  path: string;
-  type: 'file' | 'directory';
-  extension?: string;
-  relativePath?: string;
-};
+import { type FileStatus, type FileNode, FileStatusDot, getFileIcon, normalizePath, mapDirectoryEntries as mapDirEntries } from '@/lib/fileTreeUtils';
 
 type FileStatSnapshot = {
   path: string;
@@ -152,38 +148,6 @@ const OpenInAppListIcon = ({ label, iconDataUrl }: { label: string; iconDataUrl?
   );
 };
 
-const sortNodes = (items: FileNode[]) =>
-  items.slice().sort((a, b) => {
-    if (a.type !== b.type) {
-      return a.type === 'directory' ? -1 : 1;
-    }
-    return a.name.localeCompare(b.name);
-  });
-
-const normalizePath = (value: string): string => {
-  if (!value) return '';
-
-  const raw = value.replace(/\\/g, '/');
-  const hadUncPrefix = raw.startsWith('//');
-
-  let normalized = raw.replace(/\/+/g, '/');
-  if (hadUncPrefix && !normalized.startsWith('//')) {
-    normalized = `/${normalized}`;
-  }
-
-  const isUnixRoot = normalized === '/';
-  const isWindowsDriveRoot = /^[A-Za-z]:\/$/.test(normalized);
-  if (!isUnixRoot && !isWindowsDriveRoot) {
-    normalized = normalized.replace(/\/+$/, '');
-  }
-
-  return normalized;
-};
-
-const isAbsolutePath = (value: string): boolean => {
-  return value.startsWith('/') || value.startsWith('//') || /^[A-Za-z]:\//.test(value);
-};
-
 const toComparablePath = (value: string): string => {
   if (/^[A-Za-z]:\//.test(value)) {
     return value.toLowerCase();
@@ -234,29 +198,6 @@ const getDisplayPath = (root: string | null, path: string): string => {
   return relative.startsWith('/') ? relative.slice(1) : relative;
 };
 
-const DEFAULT_IGNORED_DIR_NAMES = new Set(['node_modules']);
-
-type FileStatus = 'open' | 'modified' | 'git-modified' | 'git-added' | 'git-deleted';
-
-const FileStatusDot: React.FC<{ status: FileStatus }> = ({ status }) => {
-  const color = {
-    open: 'var(--status-info)',
-    modified: 'var(--status-warning)',
-    'git-modified': 'var(--status-warning)',
-    'git-added': 'var(--status-success)',
-    'git-deleted': 'var(--status-error)',
-  }[status];
-
-  return <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />;
-};
-
-const shouldIgnoreEntryName = (name: string): boolean => DEFAULT_IGNORED_DIR_NAMES.has(name);
-
-const shouldIgnorePath = (path: string): boolean => {
-  const normalized = normalizePath(path);
-  return normalized === 'node_modules' || normalized.endsWith('/node_modules') || normalized.includes('/node_modules/');
-};
-
 const isDirectoryReadError = (error: unknown): boolean => {
   const message = error instanceof Error ? error.message : String(error ?? '');
   const normalized = message.toLowerCase();
@@ -264,10 +205,6 @@ const isDirectoryReadError = (error: unknown): boolean => {
 };
 
 const MAX_VIEW_CHARS = 200_000;
-
-const getFileIcon = (filePath: string, extension?: string): React.ReactNode => {
-  return <FileTypeIcon filePath={filePath} extension={extension} />;
-};
 
 const isMarkdownFile = (path: string): boolean => {
   if (!path) return false;
@@ -513,34 +450,6 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
   const [wrapLines, setWrapLines] = React.useState(true);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
   const [isSearchOpen, setIsSearchOpen] = React.useState(false);
-  const [isFloatingToolbarOpen, setIsFloatingToolbarOpen] = React.useState(false);
-  const floatingToolbarRef = React.useRef<HTMLDivElement | null>(null);
-  const toolbarDropdownOpenCountRef = React.useRef(0);
-
-  const handleToolbarDropdownOpenChange = React.useCallback((open: boolean) => {
-    toolbarDropdownOpenCountRef.current = Math.max(
-      0,
-      toolbarDropdownOpenCountRef.current + (open ? 1 : -1),
-    );
-  }, []);
-
-  const isClickInsidePortalledMenu = React.useCallback((target: EventTarget | null) => {
-    if (!(target instanceof Element)) return false;
-    return target.closest('[data-slot="dropdown-menu-content"], [data-slot="dropdown-menu-item"]') !== null;
-  }, []);
-
-  React.useEffect(() => {
-    if (!isFloatingToolbarOpen) return;
-    const handler = (event: MouseEvent) => {
-      if (toolbarDropdownOpenCountRef.current > 0) return;
-      if (isClickInsidePortalledMenu(event.target)) return;
-      if (floatingToolbarRef.current && !floatingToolbarRef.current.contains(event.target as Node)) {
-        setIsFloatingToolbarOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [isClickInsidePortalledMenu, isFloatingToolbarOpen]);
   const [textViewMode, setTextViewMode] = React.useState<'view' | 'edit'>('edit');
   const [mdViewMode, setMdViewMode] = React.useState<'preview' | 'edit'>('edit');
   const [jsonViewMode, setJsonViewMode] = React.useState<'tree' | 'text'>('tree');
@@ -564,6 +473,8 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
   const openPaths = useFilesViewTabsStore((state) => (root ? (state.byRoot[root]?.openPaths ?? EMPTY_PATHS) : EMPTY_PATHS));
   const selectedPath = useFilesViewTabsStore((state) => (root ? (state.byRoot[root]?.selectedPath ?? null) : null));
   const expandedPaths = useFilesViewTabsStore((state) => (root ? (state.byRoot[root]?.expandedPaths ?? EMPTY_PATHS) : EMPTY_PATHS));
+  const expandedPathsRef = React.useRef(expandedPaths);
+  expandedPathsRef.current = expandedPaths;
   const addOpenPath = useFilesViewTabsStore((state) => state.addOpenPath);
   const removeOpenPath = useFilesViewTabsStore((state) => state.removeOpenPath);
   const removeOpenPathsByPrefix = useFilesViewTabsStore((state) => state.removeOpenPathsByPrefix);
@@ -685,11 +596,21 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
   }, [files]);
 
   const handleOpenInApp = React.useCallback(async (app: { id: string; appName: string }) => {
-    if (!selectedFile?.path) {
+    if (!selectedFile?.path || !root) {
       return;
     }
 
-    const openedInApp = await openDesktopFileInApp(selectedFile.path, app.id, app.appName);
+    const fileDirectory = getParentDirectoryPath(selectedFile.path) || root;
+
+    if (OPEN_DIRECTORY_APP_IDS.has(app.id)) {
+      const openedDirectory = await openDesktopPath(fileDirectory, app.appName);
+      if (!openedDirectory) {
+        toast.error(`Failed to open in ${app.appName}`);
+      }
+      return;
+    }
+
+    const openedInApp = await openDesktopProjectInApp(root, app.id, app.appName, selectedFile.path);
     if (openedInApp) {
       return;
     }
@@ -699,14 +620,10 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
       return;
     }
 
-    const fileDirectory = getParentDirectoryPath(selectedFile.path) || root;
-    if (fileDirectory) {
-      const openedDirectory = await openDesktopPath(fileDirectory, app.appName);
-      if (openedDirectory) {
-        return;
-      }
+    const openedDirectory = await openDesktopPath(fileDirectory, app.appName);
+    if (!openedDirectory) {
+      toast.error(`Failed to open in ${app.appName}`);
     }
-    toast.error(`Failed to open in ${app.appName}`);
   }, [root, selectedFile?.path]);
 
   const handleOpenDialog = React.useCallback((type: 'createFile' | 'createFolder' | 'rename' | 'delete', data: { path: string; name?: string; type?: 'file' | 'directory' }) => {
@@ -827,31 +744,11 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
     setLineSelection(null);
   }, [lineSelection, saveComment]);
 
-  const mapDirectoryEntries = React.useCallback((dirPath: string, entries: Array<{ name: string; path: string; isDirectory: boolean }>): FileNode[] => {
-    const nodes = entries
-      .filter((entry) => entry && typeof entry.name === 'string' && entry.name.length > 0)
-      .filter((entry) => showHidden || !entry.name.startsWith('.'))
-      .filter((entry) => showGitignored || !shouldIgnoreEntryName(entry.name))
-      .map<FileNode>((entry) => {
-        const name = entry.name;
-        const normalizedEntryPath = normalizePath(entry.path || '');
-        const path = normalizedEntryPath
-          ? (isAbsolutePath(normalizedEntryPath)
-            ? normalizedEntryPath
-            : normalizePath(`${dirPath}/${normalizedEntryPath}`))
-          : normalizePath(`${dirPath}/${name}`);
-        const type = entry.isDirectory ? 'directory' : 'file';
-        const extension = type === 'file' && name.includes('.') ? name.split('.').pop()?.toLowerCase() : undefined;
-        return {
-          name,
-          path,
-          type,
-          extension,
-        };
-      });
-
-    return sortNodes(nodes);
-  }, [showGitignored, showHidden]);
+  const mapDirectoryEntries = React.useCallback(
+    (dirPath: string, entries: Array<{ name: string; path: string; isDirectory: boolean }>): FileNode[] =>
+      mapDirEntries(dirPath, entries, showHidden),
+    [showHidden],
+  );
 
   const loadDirectory = React.useCallback(async (dirPath: string) => {
     const normalizedDir = normalizePath(dirPath.trim());
@@ -961,8 +858,18 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
       lastFilesViewTreeKeyRef.current = treeKey;
       loadedDirsRef.current = new Set();
       inFlightDirsRef.current = new Set();
-      setChildrenByDir((prev) => (Object.keys(prev).length === 0 ? prev : {}));
+      // Do NOT clear childrenByDir — keeping previous data prevents the tree
+      // from collapsing while new filtered data loads in-place.
       void loadDirectory(root);
+
+      // Also re-fetch already-expanded sub-directories so their children
+      // reflect the new filter state without requiring a full collapse.
+      for (const p of expandedPathsRef.current) {
+        const normalized = normalizePath(p);
+        if (normalized && normalized !== root && normalized.startsWith(`${root}/`)) {
+          void loadDirectory(normalized);
+        }
+      }
     }
   }, [loadDirectory, root, showGitignored, showHidden]);
 
@@ -1178,9 +1085,8 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
           return;
         }
 
-        const filtered = hits.filter((hit) => showGitignored || !shouldIgnorePath(hit.path));
-
-        const mapped: FileNode[] = filtered.map((hit) => ({
+        // Server-side respectGitignore already filters gitignored entries.
+        const mapped: FileNode[] = hits.map((hit) => ({
           name: hit.name,
           path: normalizePath(hit.path),
           type: 'file',
@@ -2455,7 +2361,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
           ) : null
         )}
 
-        <DropdownMenu onOpenChange={handleToolbarDropdownOpenChange}>
+        <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
               variant="ghost"
@@ -2855,29 +2761,8 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
 
       <div className="flex-1 min-h-0 min-w-0 relative">
         {selectedFile && !isSearchOpen && (
-          <div
-            ref={floatingToolbarRef}
-            className="absolute right-3 top-3 z-30"
-            onMouseEnter={() => setIsFloatingToolbarOpen(true)}
-            onMouseLeave={() => {
-              if (toolbarDropdownOpenCountRef.current > 0) return;
-              setIsFloatingToolbarOpen(false);
-            }}
-          >
-            {isFloatingToolbarOpen ? (
-              renderFloatingFileControls()
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsFloatingToolbarOpen(true)}
-                className="h-8 w-8 rounded-lg border border-[var(--interactive-border)] bg-[var(--surface-elevated)] p-0 text-muted-foreground shadow-sm hover:text-foreground"
-                aria-label="Show editor controls"
-                title="Editor controls"
-              >
-                <RiMore2Fill className="h-4 w-4" />
-              </Button>
-            )}
+          <div className="absolute right-3 top-3 z-30">
+            {renderFloatingFileControls()}
           </div>
         )}
         <ScrollableOverlay outerClassName="h-full min-w-0" className="h-full min-w-0">
@@ -3111,6 +2996,15 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
               </button>
             )}
           </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => toggleFilesViewShowGitignored(showGitignored)}
+            className={cn("h-8 w-8 p-0 flex-shrink-0", showGitignored && "text-primary")}
+            title={showGitignored ? 'Hide gitignored files' : 'Show gitignored files'}
+          >
+            {showGitignored ? <RiEyeLine className="h-4 w-4" /> : <RiEyeOffLine className="h-4 w-4" />}
+          </Button>
           <Button
             variant="ghost"
             size="sm"
