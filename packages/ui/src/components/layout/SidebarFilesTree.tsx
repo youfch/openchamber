@@ -14,6 +14,8 @@ import {
   RiRefreshLine,
   RiSearchLine,
   RiDownloadLine,
+  RiEyeLine,
+  RiEyeOffLine,
 } from '@remixicon/react';
 
 import { toast } from '@/components/ui';
@@ -43,7 +45,7 @@ import { useFilesViewTabsStore } from '@/stores/useFilesViewTabsStore';
 import { useUIStore } from '@/stores/useUIStore';
 import { useGitStatus } from '@/stores/useGitStore';
 import { useDirectoryShowHidden } from '@/lib/directoryShowHidden';
-import { useFilesViewShowGitignored } from '@/lib/filesViewShowGitignored';
+import { useFilesViewShowGitignored, setFilesViewShowGitignored, readStoredShowGitignored } from '@/lib/filesViewShowGitignored';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import { cn, getRevealLabel } from '@/lib/utils';
 import { opencodeClient } from '@/lib/opencode/client';
@@ -855,6 +857,15 @@ export const SidebarFilesTree: React.FC = () => {
         )}
         <Button variant="ghost" size="sm" onClick={() => void refreshRoot()} className="h-8 w-8 p-0 flex-shrink-0" title="Refresh">
           <RiRefreshLine className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setFilesViewShowGitignored(!readStoredShowGitignored())}
+          className={cn("h-8 w-8 p-0 flex-shrink-0", showGitignored && "text-primary")}
+          title={showGitignored ? 'Hide gitignored files' : 'Show gitignored files'}
+        >
+          {showGitignored ? <RiEyeLine className="h-4 w-4" /> : <RiEyeOffLine className="h-4 w-4" />}
         </Button>
       </div>
 

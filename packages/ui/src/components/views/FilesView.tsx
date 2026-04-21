@@ -28,6 +28,8 @@ import {
   RiNodeTree,
   RiDownloadLine,
   RiMenuFold2Line,
+  RiEyeLine,
+  RiEyeOffLine,
 } from '@remixicon/react';
 import { toast } from '@/components/ui';
 import { copyTextToClipboard } from '@/lib/clipboard';
@@ -74,7 +76,7 @@ import { useGitStatus } from '@/stores/useGitStore';
 import { buildCodeMirrorCommentWidgets, normalizeLineRange, useInlineCommentController } from '@/components/comments';
 import { opencodeClient } from '@/lib/opencode/client';
 import { useDirectoryShowHidden } from '@/lib/directoryShowHidden';
-import { useFilesViewShowGitignored } from '@/lib/filesViewShowGitignored';
+import { useFilesViewShowGitignored, setFilesViewShowGitignored, readStoredShowGitignored } from '@/lib/filesViewShowGitignored';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import { FileTypeIcon } from '@/components/icons/FileTypeIcon';
@@ -2996,6 +2998,15 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
           </Button>
           <Button variant="ghost" size="sm" onClick={() => void refreshRoot()} className="h-8 w-8 p-0 flex-shrink-0">
             <RiRefreshLine className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setFilesViewShowGitignored(!readStoredShowGitignored())}
+            className={cn("h-8 w-8 p-0 flex-shrink-0", showGitignored && "text-primary")}
+            title={showGitignored ? 'Hide gitignored files' : 'Show gitignored files'}
+          >
+            {showGitignored ? <RiEyeLine className="h-4 w-4" /> : <RiEyeOffLine className="h-4 w-4" />}
           </Button>
         </div>
       </div>
