@@ -76,7 +76,7 @@ import { useGitStatus } from '@/stores/useGitStore';
 import { buildCodeMirrorCommentWidgets, normalizeLineRange, useInlineCommentController } from '@/components/comments';
 import { opencodeClient } from '@/lib/opencode/client';
 import { useDirectoryShowHidden } from '@/lib/directoryShowHidden';
-import { useFilesViewShowGitignored, setFilesViewShowGitignored, readStoredShowGitignored } from '@/lib/filesViewShowGitignored';
+import { useFilesViewShowGitignored, toggleFilesViewShowGitignored } from '@/lib/filesViewShowGitignored';
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary';
 import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import { FileTypeIcon } from '@/components/icons/FileTypeIcon';
@@ -3002,7 +3002,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setFilesViewShowGitignored(!readStoredShowGitignored())}
+            onClick={() => toggleFilesViewShowGitignored()}
             className={cn("h-8 w-8 p-0 flex-shrink-0", showGitignored && "text-primary")}
             title={showGitignored ? 'Hide gitignored files' : 'Show gitignored files'}
           >

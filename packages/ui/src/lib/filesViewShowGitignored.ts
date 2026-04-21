@@ -6,7 +6,7 @@ import { updateDesktopSettings } from '@/lib/persistence';
 const SHOW_GITIGNORED_STORAGE_KEY = 'filesViewShowGitignored';
 const SHOW_GITIGNORED_EVENT = 'files-view-show-gitignored-change';
 
-export const readStoredShowGitignored = (): boolean => {
+const readStoredShowGitignored = (): boolean => {
   if (typeof window === 'undefined') {
     return false;
   }
@@ -16,6 +16,10 @@ export const readStoredShowGitignored = (): boolean => {
   } catch {
     return false;
   }
+};
+
+export const toggleFilesViewShowGitignored = (): void => {
+  setFilesViewShowGitignored(!readStoredShowGitignored());
 };
 
 export const notifyFilesViewShowGitignoredChanged = () => {
