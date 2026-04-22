@@ -610,7 +610,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
       return;
     }
 
-    const openedInApp = await openDesktopProjectInApp(root, app.id, app.appName, selectedFile.path);
+    const openedInApp = await openDesktopProjectInApp(root, app.id, app.appName);
     if (openedInApp) {
       return;
     }
