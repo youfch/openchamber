@@ -140,6 +140,8 @@ export const useChatAutoFollow = ({
     // (skeleton rendered, no scroll container yet), we record the session here
     // so a follow-up effect can replay the restore once the container mounts.
     const pendingInitialRestoreRef = React.useRef<string | null>(null);
+    const sessionIsWorkingRef = React.useRef(sessionIsWorking);
+    sessionIsWorkingRef.current = sessionIsWorking;
 
     const updateViewportAnchor = useViewportStore((s) => s.updateViewportAnchor);
 
@@ -459,7 +461,10 @@ export const useChatAutoFollow = ({
 
         const now = typeof performance !== 'undefined' ? performance.now() : Date.now();
         const inGrace = (now - lastUserReleaseAtRef.current) < REPIN_GRACE_AFTER_RELEASE_MS;
-        if (stateRef.current === 'released' && isNearBottom(container, isMobile) && !inGrace) {
+        const rePinThreshold = sessionIsWorkingRef.current
+            ? (isMobile ? 8 : 16)
+            : computeBottomZoneThreshold(isMobile, container);
+        if (stateRef.current === 'released' && distanceFromBottom(container) <= rePinThreshold && !inGrace) {
             setStateValue('following');
             startFollowLoop();
         }
