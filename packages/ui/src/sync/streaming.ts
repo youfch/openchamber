@@ -89,6 +89,13 @@ export function updateStreamingState(state: State) {
         break
       }
       if (messages[i].role === "assistant") {
+        // Skip already-completed assistants — prevent them from re-entering
+        // streaming state when session_status temporarily flips to "busy"
+        // before a new optimistic user message is visible in state.message.
+        const completed = (messages[i].time as { completed?: number } | undefined)?.completed
+        if (typeof completed === "number" && completed > 0) {
+          continue
+        }
         streamingMsg = messages[i]
         break
       }

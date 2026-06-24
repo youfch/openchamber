@@ -1155,7 +1155,10 @@ export default React.memo(ChatMessage, (prev, next) => {
             next.nextMessage ? { info: next.nextMessage.info, parts: next.nextMessage.parts } : undefined
         )
         && prev.isInActiveTurn === next.isInActiveTurn
-        && prev.activeStreamingPhase === next.activeStreamingPhase
+        // Only compare activeStreamingPhase for messages that are actually in the
+        // active turn — avoids unnecessary re-renders of completed messages when
+        // a new question starts streaming (activeStreamingPhase: null → "streaming").
+        && (!prev.isInActiveTurn || prev.activeStreamingPhase === next.activeStreamingPhase)
         && prev.reviewTransferDirection === next.reviewTransferDirection
         && prev.assistantHeaderMessageId === next.assistantHeaderMessageId
         && prev.animateUserOnMount === next.animateUserOnMount

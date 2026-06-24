@@ -982,7 +982,8 @@ const AssistantMessageBody = React.memo(({
     const isTouchContext = Boolean(hasTouchInput ?? isMobile);
     const alwaysShowMessageActions = Boolean(alwaysShowActions ?? isMobile);
     const awaitingMessageCompletion = !isMessageCompleted;
-    const animateActivityRows = awaitingMessageCompletion || Boolean(turnGroupingContext?.isWorking);
+    const animateActivityRows = awaitingMessageCompletion
+        || (!isMessageCompleted && Boolean(turnGroupingContext?.isWorking));
 
     const visibleParts = React.useMemo(() => {
         return parts
