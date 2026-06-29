@@ -20,6 +20,8 @@ export interface SettingsSearchResult extends SettingsSearchItem {
 interface SettingsSearchAvailabilityContext extends SettingsRuntimeContext {
   isMobile: boolean;
   isDesktopLocalOrigin: boolean;
+  // macOS desktop shell — for controls that only render on darwin (e.g. dock badge).
+  isMac: boolean;
 }
 
 const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
@@ -64,6 +66,16 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     descriptionKey: 'settings.openchamber.visual.field.macVibrancyHint',
     keywords: ['transparent', 'transparency', 'vibrancy', 'blur', 'macos', 'opaque'],
     isAvailable: (ctx) => ctx.isDesktopLocalOrigin,
+  },
+  {
+    id: 'appearance.dock-badge',
+    page: 'appearance',
+    titleKey: 'settings.openchamber.visual.field.dockBadge',
+    descriptionKey: 'settings.openchamber.visual.field.dockBadgeHint',
+    keywords: ['dock', 'badge', 'unread', 'unseen', 'counter', 'count', 'notification', 'macos'],
+    // Exactly matches the render guard in OpenChamberVisualSettings: any darwin
+    // Electron shell (isMac already implies isDesktopShell), local or remote host.
+    isAvailable: (ctx) => ctx.isMac,
   },
   {
     id: 'appearance.pwa-install-name',
@@ -205,11 +217,11 @@ const SETTINGS_SEARCH_ITEMS: readonly SettingsSearchItem[] = [
     isAvailable: (ctx) => !ctx.isVSCode,
   },
   {
-    id: 'chat.queue-mode',
+    id: 'chat.follow-up-behavior',
     page: 'chat',
-    titleKey: 'settings.openchamber.visual.field.queueMessagesByDefault',
-    descriptionKey: 'settings.openchamber.visual.field.queueMessagesByDefaultTooltip',
-    keywords: ['queue', 'enter', 'send'],
+    titleKey: 'settings.openchamber.visual.section.followUpBehavior',
+    descriptionKey: 'settings.openchamber.visual.field.followUpBehaviorDescription',
+    keywords: ['follow up', 'queue', 'steer', 'send immediately'],
   },
   {
     id: 'chat.persist-drafts',
