@@ -1193,12 +1193,16 @@ const StaticHistoryList = React.memo(({ entries, engine, contentRef, scrollRef, 
     if (engine === 'tanstack') {
         const virtualItems = tanstackVirtualizer.getVirtualItems();
         const startOffset = virtualItems[0]?.start ?? 0;
-        // Rendered rows stay in normal flow inside a single translated wrapper
+        // Rendered rows stay in normal flow inside a single positioned wrapper
         // (not per-row absolute positioning) so per-turn sticky user headers
         // keep working against the scroll container.
+        // NOTE: position: relative (without z-index) is used instead of
+        // transform: translateY() because transform creates a CSS stacking
+        // context, causing later turns to paint on top of earlier turns and
+        // overlap their action buttons / bottom content. (issues #2119, #2095)
         return (
             <div ref={sizeContainerRef} className="relative w-full" style={{ height: tanstackVirtualizer.getTotalSize() }}>
-                <div style={{ transform: `translateY(${startOffset}px)` }}>
+                <div style={{ position: 'relative', top: `${startOffset}px` }}>
                     {virtualItems.map((item) => {
                         const entry = renderEntries[item.index];
                         if (!entry) return null;
