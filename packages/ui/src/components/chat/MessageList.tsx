@@ -1207,12 +1207,18 @@ const StaticHistoryList = React.memo(({ entries, engine, contentRef, scrollRef, 
                     {virtualItems.map((item) => {
                         const entry = renderEntries[item.index];
                         if (!entry) return null;
+                        // Each turn wrapper gets a decreasing z-index so earlier
+                        // turns paint on top of later turns. Without this,
+                        // Turn N+1's sticky header (at top:0) overlaps Turn N's
+                        // action buttons / bottom content. (issues #2119, #2095)
+                        const zIndex = renderEntries.length - item.index + 1000;
                         return (
                             <div
                                 key={entry.key}
                                 data-index={item.index}
                                 ref={tanstackVirtualizer.measureElement}
                                 data-turn-entry={entry.key}
+                                style={{ position: 'relative', zIndex }}
                             >
                                 {renderEntry(entry)}
                             </div>
