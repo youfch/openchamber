@@ -1193,16 +1193,17 @@ const StaticHistoryList = React.memo(({ entries, engine, contentRef, scrollRef, 
     if (engine === 'tanstack') {
         const virtualItems = tanstackVirtualizer.getVirtualItems();
         const startOffset = virtualItems[0]?.start ?? 0;
-        // Rendered rows stay in normal flow inside a single positioned wrapper
-        // (not per-row absolute positioning) so per-turn sticky user headers
-        // keep working against the scroll container.
-        // NOTE: position: relative (without z-index) is used instead of
-        // transform: translateY() because transform creates a CSS stacking
-        // context, causing later turns to paint on top of earlier turns and
-        // overlap their action buttons / bottom content. (issues #2119, #2095)
+        // Rendered rows stay in normal flow inside a single offset wrapper (not
+        // per-row absolute positioning) so per-turn sticky user headers keep
+        // working against the scroll container. The offset MUST be padding, not
+        // transform: a transformed ancestor becomes the sticky containing block,
+        // so headers would stick to the wrapper's (arbitrary, overscan-dependent)
+        // top edge mid-list and float over the previous turn. Padding only
+        // changes when the virtual window shifts — not per scroll frame — so the
+        // layout cost is negligible.
         return (
             <div ref={sizeContainerRef} className="relative w-full" style={{ height: tanstackVirtualizer.getTotalSize() }}>
-                <div style={{ position: 'relative', top: `${startOffset}px` }}>
+                <div style={{ paddingTop: `${startOffset}px` }}>
                     {virtualItems.map((item) => {
                         const entry = renderEntries[item.index];
                         if (!entry) return null;
